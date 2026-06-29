@@ -68,7 +68,6 @@ function paginate(evts, pages) {
 const pages = paginate(events, totalPages);
 
 function weights(evts) {
-  // 提高 min weight 避免窄列截断文字
   return evts.map(e => Math.max(1.2, Math.min(Math.ceil(e.event.length / 10), 3)));
 }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -77,6 +76,13 @@ function liten(hex) {
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   const l = v => Math.round(v + (255-v)*0.92);
   return '#'+[l(r),l(g),l(b)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+function parseDate(str) {
+  const m = str.match(/(\d{4})[年\-\/.](\d{1,2})[月\-\/.](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  const m2 = str.match(/(\d{4})[年\-\/.](\d{1,2})/);
+  return m2 ? new Date(+m2[1], +m2[2] - 1, 15) : null;
 }
 
 function legendHTML() {
@@ -90,10 +96,16 @@ function legendHTML() {
 
 function slideHTML(evts, idx) {
   const ws = weights(evts);
+  // sqrt间隙值
+  const gaps = [];
+  for (let i = 1; i < evts.length; i++) {
+    const a = parseDate(evts[i-1].date), b = parseDate(evts[i].date);
+    const days = a && b ? Math.abs(Math.round((b - a) / 86400000)) : 30;
+    gaps.push(Math.sqrt(Math.max(days, 1)) * 0.08);
+  }
   let cols = '';
   for (let i = 0; i < evts.length; i++) {
     const e = evts[i], rp = resolveParty(e.party), c = rp.colors[0], top = rp.position==='top', w = ws[i], bg = liten(c);
-    // 圆点：单色用纯色，多色用 conic-gradient
     const dotStyle = rp.colors.length > 1
       ? `width:14px;height:14px;background:conic-gradient(${rp.colors.map((cl,k)=>`${cl} ${k/rp.colors.length*100}% ${(k+1)/rp.colors.length*100}%`).join(',')});`
       : '';
@@ -110,6 +122,9 @@ function slideHTML(evts, idx) {
         <div class="dot${rp.colors.length>1?' dot-m':''}" style="${dotStyle}"></div>
         <div class="dt">${esc(e.date)}</div>
       </div>`;
+    if (i < evts.length - 1) {
+      cols += `<div class="gap-col" style="flex:${gaps[i].toFixed(2)};"></div>`;
+    }
   }
   const lbl = totalPages > 1 ? `${idx+1}/${totalPages}` : '';
   return `<div class="slide${idx===0?' active':''}" data-p="${idx}">
@@ -150,6 +165,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#1a1a2e;c
 
 /* 列 */
 .col{display:flex;flex-direction:column;align-items:center;min-width:60px;position:relative}
+.gap-col{min-width:4px;flex-shrink:1}
 .half{flex:1;display:flex;flex-direction:column;align-items:center;width:100%;padding:0 2px}
 .ht{justify-content:flex-end}.hb{justify-content:flex-start}
 
